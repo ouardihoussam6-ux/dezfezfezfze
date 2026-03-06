@@ -1,5 +1,5 @@
 #!/bin/bash
-# Smart Park — Script de déploiement
+# Smart Park — Script de deploiement
 # Lance depuis le dossier du projet sur le Raspberry Pi :
 #   bash deploy.sh
 
@@ -14,7 +14,7 @@ echo " Smart Park — Deploiement"
 echo "===================================================="
 
 # --- Verifications ---
-echo "[1/7] Verification des dependances..."
+echo "[1/6] Verification des dependances..."
 
 if ! command -v apache2 &>/dev/null; then
     echo "     Apache non installe. Installation..."
@@ -34,10 +34,10 @@ fi
 
 echo "     OK"
 
-# --- Base de données (via sudo mysql, bypass unix_socket auth) ---
-echo "[2/7] Initialisation de la base de donnees..."
+# --- Base de donnees ---
+echo "[2/6] Initialisation de la base de donnees..."
 
-sudo mysql << 'SQL'
+mysql -u root -proot << 'SQL'
 CREATE DATABASE IF NOT EXISTS smart_park
     CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -82,53 +82,19 @@ SQL
 
 echo "     OK"
 
-# --- Sauvegarde des anciens fichiers ---
-echo "[3/7] Sauvegarde des fichiers existants (suffixe _old)..."
+# --- Nettoyage des anciens fichiers ---
+echo "[3/6] Suppression des anciens fichiers..."
 
-backup() {
-    local name="$1"
-    local target="$WEB_ROOT/$name"
-    local ext="${name##*.}"
-    local bak
-
-    # Dossier ou fichier sans extension -> name_old
-    # Fichier avec extension         -> name_old.ext
-    if [ "$name" = "$ext" ]; then
-        bak="$WEB_ROOT/${name}_old"
-    else
-        bak="$WEB_ROOT/${name%.*}_old.${ext}"
-    fi
-
-    if [ -e "$target" ]; then
-        sudo rm -rf "$bak"
-        sudo mv "$target" "$bak"
-        echo "     $name  =>  ${bak##*/}"
-    fi
-}
-
-# Dossiers
-backup "api"
-backup "assets"
-backup "config"
-backup "includes"
-backup "models"
-
-# Fichiers PHP
-backup "index.php"
-backup "inscription.php"
-backup "badges.php"
-backup "logs.php"
-backup "setup.php"
-
-# Fichier de reset (on ne sauvegarde pas, on garde l'existant s'il y en a un)
-if [ ! -f "$WEB_ROOT/reset_ordre.txt" ]; then
-    sudo cp "$PROJECT/reset_ordre.txt" "$WEB_ROOT/"
-fi
+for item in api assets config includes models \
+            index.php inscription.php badges.php logs.php setup.php \
+            check_uid.php api_rfid.php clear_reset.php; do
+    sudo rm -rf "$WEB_ROOT/$item"
+done
 
 echo "     OK"
 
 # --- Copie des nouveaux fichiers ---
-echo "[4/7] Copie des nouveaux fichiers vers $WEB_ROOT..."
+echo "[4/6] Copie des fichiers vers $WEB_ROOT..."
 
 sudo cp -r "$PROJECT/api"      "$WEB_ROOT/"
 sudo cp -r "$PROJECT/assets"   "$WEB_ROOT/"
@@ -141,11 +107,19 @@ sudo cp "$PROJECT/inscription.php" "$WEB_ROOT/"
 sudo cp "$PROJECT/badges.php"      "$WEB_ROOT/"
 sudo cp "$PROJECT/logs.php"        "$WEB_ROOT/"
 sudo cp "$PROJECT/setup.php"       "$WEB_ROOT/"
+sudo cp "$PROJECT/check_uid.php"   "$WEB_ROOT/"
+sudo cp "$PROJECT/api_rfid.php"    "$WEB_ROOT/"
+sudo cp "$PROJECT/clear_reset.php" "$WEB_ROOT/"
+
+# reset_ordre.txt : ne pas ecraser s'il existe deja (conserver l'etat)
+if [ ! -f "$WEB_ROOT/reset_ordre.txt" ]; then
+    sudo cp "$PROJECT/reset_ordre.txt" "$WEB_ROOT/"
+fi
 
 echo "     OK"
 
 # --- Permissions ---
-echo "[5/7] Application des permissions..."
+echo "[5/6] Application des permissions..."
 
 sudo chown -R www-data:www-data "$WEB_ROOT"
 sudo find "$WEB_ROOT" -type d -exec chmod 755 {} \;
@@ -155,27 +129,16 @@ sudo chmod 664 "$WEB_ROOT/reset_ordre.txt"
 echo "     OK"
 
 # --- Apache ---
-echo "[6/7] Redemarrage d'Apache..."
+echo "[6/6] Redemarrage d'Apache..."
 sudo systemctl restart apache2
 echo "     OK"
 
-# --- Test ---
-echo "[7/7] Test de connectivite..."
 sleep 1
 HTTP=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/index.php 2>/dev/null || echo "000")
-if [ "$HTTP" = "200" ]; then
-    echo "     HTTP $HTTP — Site operationnel"
-else
-    echo "     HTTP $HTTP — Verifiez Apache et PHP"
-fi
 
 echo ""
 echo "===================================================="
-echo " Termine !"
-echo " Dashboard : http://$LOCAL_IP/index.php"
-echo " API ESP32 : http://$LOCAL_IP/api/check_uid.php"
-echo ""
-echo " Anciens fichiers gardes avec le suffixe _old :"
-echo "   api_old/  assets_old/  config_old/  models_old/"
-echo "   index_old.php  badges_old.php  logs_old.php  etc."
+echo " Termine !  HTTP $HTTP"
+echo " Dashboard  : http://$LOCAL_IP/index.php"
+echo " Verification : http://$LOCAL_IP/setup.php"
 echo "===================================================="

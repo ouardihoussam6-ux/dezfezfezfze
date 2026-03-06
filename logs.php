@@ -6,7 +6,7 @@ require_once __DIR__ . '/includes/layout.php';
 
 const PER_PAGE = 30;
 
-$page = max(1, (int)($_GET['page'] ?? 1));
+$page = max(1, (int) ($_GET['page'] ?? 1));
 
 $actionLabel = [
     'lecture'          => 'Lecture',
@@ -31,10 +31,8 @@ try {
 render_header('Journaux', 'logs.php');
 ?>
 
-<div class="page-header">
-    <h1>Journaux</h1>
-    <p><?= number_format($total) ?> événement<?= $total !== 1 ? 's' : '' ?> enregistré<?= $total !== 1 ? 's' : '' ?>.</p>
-</div>
+<p class="page-title">Journaux</p>
+<p class="page-sub"><?= number_format($total) ?> événement<?= $total !== 1 ? 's' : '' ?> enregistré<?= $total !== 1 ? 's' : '' ?>.</p>
 
 <?php if ($error): ?>
     <div class="alert alert-err"><?= htmlspecialchars($error) ?></div>
@@ -55,21 +53,18 @@ render_header('Journaux', 'logs.php');
                 <tr><td colspan="4" class="empty">Aucun journal disponible.</td></tr>
             <?php else: ?>
                 <?php foreach ($logs as $log): ?>
-                    <?php
-                        $dt     = new DateTimeImmutable($log['date_heure']);
-                        $action = $log['action'];
-                    ?>
+                    <?php $dt = new DateTimeImmutable($log['date_heure']); ?>
                     <tr>
-                        <td data-label="Date"><?= $dt->format('d/m/Y H:i:s') ?></td>
+                        <td data-label="Date" style="color:var(--neutral-600)"><?= $dt->format('d/m/Y H:i:s') ?></td>
                         <td data-label="Badge"><span class="mono"><?= htmlspecialchars($log['tag_id']) ?></span></td>
                         <td data-label="Action">
-                            <span class="action-pill <?= htmlspecialchars($action) ?>">
-                                <?= htmlspecialchars($actionLabel[$action] ?? $action) ?>
+                            <span class="action-badge <?= htmlspecialchars($log['action']) ?>">
+                                <?= htmlspecialchars($actionLabel[$log['action']] ?? $log['action']) ?>
                             </span>
                         </td>
                         <td data-label="Place">
-                            <span class="slot-badge <?= $log['slot'] == 0 ? 's0' : '' ?>">
-                                <?= $log['slot'] > 0 ? (int)$log['slot'] : '—' ?>
+                            <span class="slot-circle <?= $log['slot'] == 0 ? 'empty' : '' ?>">
+                                <?= $log['slot'] > 0 ? (int) $log['slot'] : '—' ?>
                             </span>
                         </td>
                     </tr>
@@ -84,7 +79,6 @@ render_header('Journaux', 'logs.php');
         <?php if ($page > 1): ?>
             <a href="?page=<?= $page - 1 ?>">&lsaquo;</a>
         <?php endif; ?>
-
         <?php for ($i = max(1, $page - 3); $i <= min($pages, $page + 3); $i++): ?>
             <?php if ($i === $page): ?>
                 <span class="cur"><?= $i ?></span>
@@ -92,7 +86,6 @@ render_header('Journaux', 'logs.php');
                 <a href="?page=<?= $i ?>"><?= $i ?></a>
             <?php endif; ?>
         <?php endfor; ?>
-
         <?php if ($page < $pages): ?>
             <a href="?page=<?= $page + 1 ?>">&rsaquo;</a>
         <?php endif; ?>
