@@ -125,7 +125,7 @@
 })();
 
 
-/* ── RFID USB HID scanner (inscription.php) ─────────────────── */
+/* ── Scanner RFID via ESP32 (inscription.php) ───────────────── */
 (function rfidScanner() {
     const zone    = document.getElementById('scan-zone');
     const input   = document.getElementById('uid');
@@ -133,89 +133,61 @@
     const subTxt  = document.getElementById('scan-sub');
     if (!zone || !input) return;
 
-    let active  = false;
-    let buffer  = '';
-    let timer   = null;
+    let pollTimer = null;
 
     function setState(s) {
         zone.className = 'scan-zone' + (s ? ' ' + s : '');
     }
 
-    function finish(uid) {
-        active = false;
-        buffer = '';
-        clearTimeout(timer);
-
-        uid = uid.trim().toUpperCase();
-        if (!uid) { reset(); return; }
-
-        input.value      = uid;
-        mainTxt.textContent = uid;
-        subTxt.textContent  = 'Badge détecté — cliquez pour scanner à nouveau';
-        setState('done');
-        input.dispatchEvent(new Event('change', { bubbles: true }));
+    function stopPoll() {
+        clearInterval(pollTimer);
+        pollTimer = null;
     }
 
     function reset() {
-        active = false;
-        buffer = '';
-        clearTimeout(timer);
+        stopPoll();
         setState('');
         mainTxt.textContent = 'Cliquez pour scanner un badge';
-        subTxt.textContent  = 'Approchez le badge du lecteur après avoir cliqué';
+        subTxt.textContent  = 'Approchez le badge du lecteur de l\'ESP32';
+    }
+
+    function onUidReceived(uid) {
+        stopPoll();
+        input.value         = uid;
+        mainTxt.textContent = uid;
+        subTxt.textContent  = 'Badge détecté — cliquez pour scanner à nouveau';
+        setState('done');
+    }
+
+    function startPoll() {
+        pollTimer = setInterval(function() {
+            fetch('/api/inscription_poll.php')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.uid) onUidReceived(data.uid);
+                })
+                .catch(function() {});
+        }, 800);
     }
 
     function activate() {
-        if (active) return;
-        active = true;
-        buffer = '';
         setState('active');
         mainTxt.textContent = 'En attente du badge…';
-        subTxt.textContent  = 'Approchez maintenant le badge du lecteur USB';
-        input.focus();
+        subTxt.textContent  = 'Approchez le badge du lecteur de l\'ESP32';
+
+        fetch('/api/inscription_start.php', { method: 'POST' })
+            .then(function() { startPoll(); })
+            .catch(function() { reset(); });
     }
 
     zone.addEventListener('click', function() {
         if (zone.classList.contains('done')) { reset(); return; }
+        if (zone.classList.contains('active')) return;
         activate();
     });
 
-    /* Intercept keyboard input when scanner active.
-       USB HID readers send keystrokes very fast (< 30 ms apart) then Enter.
-       We capture all printable chars + Enter, suppress them from the input field,
-       buffer them, and commit on Enter or after 400 ms of silence. */
-    document.addEventListener('keydown', function(e) {
-        if (!active) return;
-
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            finish(buffer);
-            return;
-        }
-
-        if (e.key.length === 1) {          // printable character
-            e.preventDefault();
-            buffer += e.key;
-            clearTimeout(timer);
-            timer = setTimeout(function() { finish(buffer); }, 400);
-        }
-    });
-
-    /* If user clicks somewhere else, deactivate */
-    document.addEventListener('click', function(e) {
-        if (active && !zone.contains(e.target) && e.target !== input) {
-            reset();
-        }
-    });
-
-    /* Also allow manual typing in the input — clear scan UI */
+    /* Saisie manuelle : annuler le mode scan */
     input.addEventListener('input', function() {
-        if (zone.classList.contains('done') || zone.classList.contains('active')) {
-            setState('');
-            mainTxt.textContent = 'Cliquez pour scanner un badge';
-            subTxt.textContent  = 'Approchez le badge du lecteur après avoir cliqué';
-        }
-        active = false;
-        buffer = '';
+        if (pollTimer) reset();
     });
 })();

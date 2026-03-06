@@ -91,6 +91,9 @@ for item in api assets config includes models \
     sudo rm -rf "$WEB_ROOT/$item"
 done
 
+# Fichiers de flag inscription (conserver si existants pour ne pas perdre l'état)
+# → recréés proprement si absents
+
 echo "     OK"
 
 # --- Copie des nouveaux fichiers ---
@@ -111,9 +114,15 @@ sudo cp "$PROJECT/check_uid.php"   "$WEB_ROOT/"
 sudo cp "$PROJECT/api_rfid.php"    "$WEB_ROOT/"
 sudo cp "$PROJECT/clear_reset.php" "$WEB_ROOT/"
 
-# reset_ordre.txt : ne pas ecraser s'il existe deja (conserver l'etat)
+# Fichiers d'état : ne pas écraser s'ils existent
 if [ ! -f "$WEB_ROOT/reset_ordre.txt" ]; then
     sudo cp "$PROJECT/reset_ordre.txt" "$WEB_ROOT/"
+fi
+if [ ! -f "$WEB_ROOT/inscription_mode.txt" ]; then
+    echo -n "0" | sudo tee "$WEB_ROOT/inscription_mode.txt" > /dev/null
+fi
+if [ ! -f "$WEB_ROOT/inscription_uid.txt" ]; then
+    echo -n "" | sudo tee "$WEB_ROOT/inscription_uid.txt" > /dev/null
 fi
 
 echo "     OK"
@@ -125,6 +134,8 @@ sudo chown -R www-data:www-data "$WEB_ROOT"
 sudo find "$WEB_ROOT" -type d -exec chmod 755 {} \;
 sudo find "$WEB_ROOT" -type f -exec chmod 644 {} \;
 sudo chmod 664 "$WEB_ROOT/reset_ordre.txt"
+sudo chmod 664 "$WEB_ROOT/inscription_mode.txt"
+sudo chmod 664 "$WEB_ROOT/inscription_uid.txt"
 
 echo "     OK"
 
